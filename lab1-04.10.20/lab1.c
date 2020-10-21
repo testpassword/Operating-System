@@ -87,9 +87,7 @@ void fillFile(long long int fileSize) {
         fcntl(frd, F_SETLKW, &readLock);
         int num;
         int min = INT_MAX;
-        while(fscanf(f, "%d ", &num) > 0) {
-            if (min > num) min = num;
-        }
+        while(fscanf(f, "%d ", &num) > 0) if (min > num) min = num;
         readLock.l_type = F_UNLCK;
         fcntl(frd, F_SETLKW, &readLock);
         fclose(f);
@@ -102,17 +100,13 @@ void fillFile(long long int fileSize) {
             pthread_create(&wThr, NULL, writeThread, NULL);
         }
         pthread_t aThrs[I];
-        for (int i = 0; i < I; i++) {
-            pthread_create(&aThrs[i], NULL, agregateThread, NULL);
-        }
-        for (int i = 0; i < I; i++) { // здесь необходимо ждать завершения поток, иначе будет segmentation fault
-            pthread_join(aThrs[i], NULL);
-        }
+        for (int i = 0; i < I; i++) pthread_create(&aThrs[i], NULL, agregateThread, NULL);
+        for (int i = 0; i < I; i++) pthread_join(aThrs[i], NULL); // здесь необходимо ждать завершения поток, иначе будет segmentation fault
     }
 }
 
 int main() {
-    fillMemory((void *) B, 130 * 1024 * 1024);
+    fillMemory((void *) B, A * 1024 * 1024);
     fillFile(E * 1024 * 1024);
     return 0;
 }
@@ -133,4 +127,7 @@ http://ru.manpages.org/fcntl/2
 https://www.opennet.ru/docs/RUS/zlp/005.html
 https://pubs.opengroup.org/onlinepubs/007908775/xsh/fileno.html
 http://www.codenet.ru/progr/cpp/spru/open.php
+https://www.tune-it.ru/documents/10136/828092/dtrace_stap_book_b10a.pdf/66cae909-5677-40d2-a306-ca265392d142
+https://eax.me/systemtap/
+https://www.thegeekstuff.com/2011/11/strace-examples/
 */
