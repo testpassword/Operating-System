@@ -31,9 +31,9 @@ void fillMemory(void* startAddress, long long int memorySize) {
     // после аллокации
     FILE* urandom = fopen("/dev/urandom", "r");
     void* threadFunc() { fread((void*) startAddress, 1, memorySize, urandom); }
-    pthread_t thr;
-    pthread_create(&thr, NULL, threadFunc, NULL);
-    pthread_join(thr, NULL);
+    pthread_t memThrs[D];
+    for (int i = 0; i < D; i++) pthread_create(&memThrs[i], NULL, threadFunc, NULL);
+    for (int i = 0; i < D; i++) pthread_join(memThrs[i], NULL); // здесь необходимо ждать завершения поток, иначе будет segmentation fault
     fclose(urandom);
     // после заполнения участка данными
     munmap((void*) startAddress, memorySize);
@@ -101,7 +101,7 @@ void fillFile(long long int fileSize) {
         }
         pthread_t aThrs[I];
         for (int i = 0; i < I; i++) pthread_create(&aThrs[i], NULL, agregateThread, NULL);
-        for (int i = 0; i < I; i++) pthread_join(aThrs[i], NULL); // здесь необходимо ждать завершения поток, иначе будет segmentation fault
+        for (int i = 0; i < I; i++) pthread_join(aThrs[i], NULL);
     }
 }
 
