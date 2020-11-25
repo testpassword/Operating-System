@@ -7,7 +7,6 @@
 #include <fcntl.h> 
 #include <unistd.h>
 #include <math.h>
-#include <fcntl.h>
 
 #define A 130
 #define B 0x126F82A
@@ -21,93 +20,94 @@
 #define J min
 #define K flock
 
-void* testThread() { while(1) { printf("next =>\n"); } }
+void* test_thread() { while(1) { printf("next =>\n"); } }
 
-short countIntDigits(int x) { return floor(log10(x) + 1); }
+short count_int_digits(int x) { return floor(log10(x) + 1); }
 
-void fillMemory(void* startAddress, long long int memorySize) {
+void fill_memory(void* start_address, long long int memory_size) {
     // до аллокации
-    C((void*) startAddress, memorySize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    C((void*) start_address, memory_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     // после аллокации
     FILE* urandom = fopen("/dev/urandom", "r");
-    void* threadFunc() { fread((void*) startAddress, 1, memorySize, urandom); }
-    pthread_t memThrs[D];
-    for (int i = 0; i < D; i++) pthread_create(&memThrs[i], NULL, threadFunc, NULL);
-    for (int i = 0; i < D; i++) pthread_join(memThrs[i], NULL); // здесь необходимо ждать завершения поток, иначе будет segmentation fault
+    void* thread_func() { fread((void*) start_address, 1, memory_size, urandom); }
+    pthread_t mem_thrs[D];
+    for (int i = 0; i < D; i++) pthread_create(&mem_thrs[i], NULL, thread_func, NULL);
+    for (int i = 0; i < D; i++) pthread_join(mem_thrs[i], NULL); // здесь необходимо ждать завершения поток, иначе будет segmentation fault
     fclose(urandom);
     // после заполнения участка данными
-    munmap((void*) startAddress, memorySize);
+    munmap((void*) start_address, memory_size);
     // после деаллокации
 }
 
-void fillFile(long long int fileSize) {
-    int restartWThread = 1;
-    void* writeThread() {
+void fill_file(long long int file_size) {
+    int restart_WThread = 1;
+    void* write_thread() {
         printf("Write thread awaken\n");
-        //fopen для файла с данными не подходит, по причинам: это не системная функция, нет возможности задать флаг, использовать буфер.
+        //fopen для записи в файл с данными не подходит, по причинам: это не системная функция, а из библиотеки C; нет возможности задать флаг; не использовать буфер.
         int flag = O_WRONLY | O_CREAT | O_TRUNC | O_DIRECT;
         int fd = open("resFile", flag, 0666);
         FILE* urandom = fopen("/dev/urandom", "r");
         /*
-        Т.к. нам нужно вывести минимальное число из файла, то считываем int из urandom. Изначально кажется, чтобы узнать количество итераций нужно 
-        (fileSize / sizeof(int)), но это ошибочный вариант, т.к. в файл будут писаться символы, а не int, а значит, к примеру, 1 и 111 будут весить 
-        по разному, а не строго 4 байта. Следовательно, на каждой итерации необходимо подсчитать количество символом в рандомном полученном числе, 
+        Изначально кажется, чтобы узнать количество итераций нужно для записи чисел, полученных из urandom нужно (file_size / sizeof(int)), 
+        но это ошибочный вариант, т.к. в файл будут писаться символы, а не int, а значит, к примеру, 1 и 111 будут весить по разному, 
+        а не строго 4 байта. Следовательно, на каждой итерации необходимо подсчитать количество символом в рандомном полученном числе, 
         конвертировать int в char[], проверять не привысило ли сумма всех char[] вес файла, и если да - прервать цикл, иначе записать новые символы в файл.
-        P.S. Полученный файл может незначительно отличаться по размеру в большую сторону, т.к. ОС выделяет место под данные на диске секторами.
+        P.S. Полученный файл может незначительно отличаться по размеру в большую сторону, т.к. ОС выделяет место под данные на диске секторами, размер 
+        которых зависит от файловой системы.
         */
-        int weightOfSequence = 0;
+        int weight_of_sequence = 0;
         for (;;) {
-            struct flock readLock;
-            memset(&readLock, 0, sizeof(readLock));
-            readLock.l_type = F_RDLCK;
-            fcntl(fd, F_SETLKW, &readLock);
+            struct flock read_lock;
+            memset(&read_lock, 0, sizeof(read_lock));
+            read_lock.l_type = F_RDLCK;
+            fcntl(fd, F_SETLKW, &read_lock);
             int val;
             fread(&val, sizeof(int), 1, urandom);
-            short numberOfDigits = countIntDigits(val) + 1; // + 1 для пробела: без этого, считывающие потоки не смогут разделить числа
-            weightOfSequence += numberOfDigits * sizeof(char);
-            if (weightOfSequence >= fileSize) break;
+            short number_of_digits = count_int_digits(val) + 1; // + 1 для пробела: без этого, считывающие потоки не смогут разделить числа
+            weight_of_sequence += number_of_digits * sizeof(char);
+            if (weight_of_sequence >= file_size) break;
             else {
-                char str[numberOfDigits];
+                char str[number_of_digits];
                 sprintf(str, "%d ", val);
-                write(fd, str, numberOfDigits);
+                write(fd, str, number_of_digits);
             }
-            readLock.l_type = F_UNLCK;
-            fcntl(fd, F_SETLKW, &readLock);
+            read_lock.l_type = F_UNLCK;
+            fcntl(fd, F_SETLKW, &read_lock);
         }
         close(fd);
         fclose(urandom);
-        restartWThread = 1;
+        restart_WThread = 1;
     }
-    void* agregateThread() {
+    void* agregate_thread() {
         FILE* f = fopen("resFile", "r");
         int frd = fileno(f);
-        struct flock readLock;
-        memset(&readLock, 0, sizeof(readLock));
-        readLock.l_type = F_WRLCK;
-        fcntl(frd, F_SETLKW, &readLock);
+        struct flock read_lock;
+        memset(&read_lock, 0, sizeof(read_lock));
+        read_lock.l_type = F_WRLCK;
+        fcntl(frd, F_SETLKW, &read_lock);
         int num;
         int min = INT_MAX;
         while(fscanf(f, "%d ", &num) > 0) if (min > num) min = num;
-        readLock.l_type = F_UNLCK;
-        fcntl(frd, F_SETLKW, &readLock);
+        read_lock.l_type = F_UNLCK;
+        fcntl(frd, F_SETLKW, &read_lock);
         fclose(f);
         //printf("The final min is %d\n", min); Выводить это нет смысла, т.к. чисел очень много, и почти сразу же будет получено INT_MIN
     }
     while (1) {
-        if (restartWThread == 1) {
-            restartWThread = 0;
-            pthread_t wThr;
-            pthread_create(&wThr, NULL, writeThread, NULL);
+        if (restart_WThread == 1) {
+            restart_WThread = 0;
+            pthread_t w_thr;
+            pthread_create(&w_thr, NULL, write_thread, NULL);
         }
-        pthread_t aThrs[I];
-        for (int i = 0; i < I; i++) pthread_create(&aThrs[i], NULL, agregateThread, NULL);
-        for (int i = 0; i < I; i++) pthread_join(aThrs[i], NULL);
+        pthread_t a_thrs[I];
+        for (int i = 0; i < I; i++) pthread_create(&a_thrs[i], NULL, agregate_thread, NULL);
+        for (int i = 0; i < I; i++) pthread_join(a_thrs[i], NULL);
     }
 }
 
 int main() {
-    fillMemory((void *) B, A * 1024 * 1024);
-    fillFile(E * 1024 * 1024);
+    fill_memory((void *) B, A * 1024 * 1024);
+    fill_file(E * 1024 * 1024);
     return 0;
 }
 
